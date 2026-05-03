@@ -1,57 +1,44 @@
-const express = require("express");
-const app = express();
+const express = require('express');
+const sequelize = require('./config/database'); 
+const User = require('./models/User');          
+const Post = require('./models/Post');          
 
-// Middleware для парсингу JSON
+const app = express();
 app.use(express.json());
 
-// Масив для зберігання даних у пам'яті (замість БД для лабораторної)
-let students = [
-    { id: 1, name: "Гром Богдан", group: "ІО-31" }
-];
 
-// Завдання 2: Базовий маршрут
-app.get("/", (req, res) => {
-    res.send("Hello from Node.js server");
-});
+User.hasMany(Post, { foreignKey: 'userId', onDelete: 'CASCADE' });
+Post.belongsTo(User, { foreignKey: 'userId' });
 
-// Завдання 3: Отримання списку студентів
-app.get("/students", (req, res) => {
-    res.json(students);
-});
 
-// Завдання 4: Додавання нового студента
-app.post("/students", (req, res) => {
-    const newStudent = {
-        id: students.length + 1,
-        name: req.body.name,
-        group: req.body.group
-    };
-    students.push(newStudent);
-    res.status(201).json(newStudent);
-});
-
-// Завдання 5: Оновлення даних студента
-app.put("/students/:id", (req, res) => {
-    const studentId = parseInt(req.params.id);
-    const student = students.find(s => s.id === studentId);
+sequelize.sync({ force: false })
+  .then(() => {
+    console.log("З'єднання з MySQL встановлено, таблиці синхронізовано.");
     
-    if (student) {
-        student.name = req.body.name || student.name;
-        student.group = req.body.group || student.group;
-        res.json(student);
-    } else {
-        res.status(404).send("Студента не знайдено");
-    }
+
+    const PORT = 3000;
+    app.listen(PORT, () => {
+      console.log(`Сервер працює на http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error("Помилка підключення до бази даних:", err);
+  });
+
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.findAll({ include: Post });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Завдання 5: Видалення студента
-app.delete("/students/:id", (req, res) => {
-    const studentId = parseInt(req.params.id);
-    students = students.filter(s => s.id !== studentId);
-    res.send(`Студента з ID ${studentId} видалено`);
-});
-
-// Запуск сервера
-app.listen(3000, () => {
-    console.log("Server started on port 3000");
+app.post('/users', async (req, res) => {
+  try {
+    const user = await User.create(req.body);
+    res.status(201).json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
